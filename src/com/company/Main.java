@@ -308,7 +308,7 @@ class SearchDelFrame extends JFrame{
     JTextArea textArea=new JTextArea(20,25);
 
     public SearchDelFrame(){
-        super("안녕");
+        super("전화번호부");
         setBounds(100,200,330,450);
         setLayout(new BorderLayout());
         Border border=BorderFactory.createEtchedBorder();
