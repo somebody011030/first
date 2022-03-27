@@ -1,14 +1,21 @@
 package com.company;
+import java.io.*;
 import java.util.Scanner;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.awt.*;
+import javax.swing.*;
+import java.awt.event.*;
+import javax.swing.border.*;
 
 interface INIT_MENU
 {
-    int INPUT=1, SEARCH=2,DELETE=3,EXIT=4;
+    int INPUT=1, EXIT=2;
 }
 
 interface INPUT_SELECT
 {
-    int NORMAL=1, UNIV=2,COMPANY=3;
+    int NORMAL=1, UNIV=2, COMPANY=3;
 }
 
 class MenuChoiceException extends Exception{
@@ -38,6 +45,9 @@ class PhoneUnivInfo extends PhoneInfo{ //대학 동기들의 전화번호 저장
         System.out.println("year : "+year);
         System.out.println("");
     }
+    public String toString(){
+        return super.toString()+"major : "+major+'\n'+"year : "+year+'\n';
+    }
 
 }
 
@@ -52,15 +62,13 @@ class PhoneCompanyInfo extends PhoneInfo{ //회사 동료들의 전화번호 저
         System.out.println("phone : "+phoneNumber);
         System.out.println("company : "+company);
     }
-
+    public String toString(){
+        return super.toString()+"company : "+company+'\n';
+    }
 }
-
-
-
 
 class MenuViewer{
     public static Scanner keyboard=new Scanner(System.in);
-
 
     public static void showMenu() {
         System.out.println("선택하세요..");
@@ -69,11 +77,10 @@ class MenuViewer{
         System.out.println("3. 데이터 삭제");
         System.out.println("4. 프로그램 종료");
         System.out.print("선택 : ");
-
     }
 }
 
-class PhoneInfo{
+class PhoneInfo implements Serializable{
     String name;
     String phoneNumber;
 
@@ -87,14 +94,25 @@ class PhoneInfo{
         System.out.println("phone : "+phoneNumber);
         System.out.println("");
     }
-
+    public int hashCode(){
+        return name.hashCode();
+    }
+    public boolean equals(Object obj){
+        PhoneInfo cmp=(PhoneInfo)obj;
+        if(name.compareTo(cmp.name)==0)
+            return true;
+        else
+            return false;
+    }
+    public String toString(){
+        return "name : "+name+'\n'+"phone : "+phoneNumber+'\n';
+    }
 }
 
 class PhoneBookManager{
+    private final File dataFile=new File("PhoneBook.dat");
     Scanner sc=new Scanner(System.in);
-    final int MAX_CNT=100;
-    PhoneInfo[] infoStorage=new PhoneInfo[MAX_CNT];
-    int curCnt=0;
+    HashSet<PhoneInfo> infoStorage=new HashSet<PhoneInfo>();
 
     static PhoneBookManager inst=null;
     public static PhoneBookManager createManagerInst() {
@@ -103,7 +121,9 @@ class PhoneBookManager{
         }
         return inst;
     }
-    private PhoneBookManager() {}
+    private PhoneBookManager() {
+        readFromFile();
+    }
 
 
     private PhoneInfo readFriendInfo() {
@@ -160,59 +180,173 @@ class PhoneBookManager{
                 break;
         }
 
-        infoStorage[curCnt++]=info;
-        System.out.println("데이터 입력이 완료되었습니다. \n");
+//        infoStorage[curCnt++]=info;
+        boolean isAdded=infoStorage.add(info);
+        if(isAdded==true)
+            System.out.println("데이터 입력이 완료되었습니다.\n");
+        else
+            System.out.println("이미 저장된 데이터입니다.\n");
     }
 
-    public void searchData() {
-        System.out.println("데이터 검색을 시작합니다..");
-
-        System.out.print("이름 : ");
-        String name=MenuViewer.keyboard.nextLine();
-
-        int dataIdx=search(name);
-        if(dataIdx<0) {
-            System.out.println("해당하는 데이터가 존재하지 않습니다. \n");
-        }
-        else {
-            infoStorage[dataIdx].showPhoneInfo();
-            System.out.println("데이터 검색이 완료되었습니다.");
-        }
+    public String searchData(String name) {
+        PhoneInfo info=search(name);
+        if(info==null)
+            return null;
+        else
+            return info.toString();
     }
 
-    public void deleteData() {
-        System.out.println("데이터 삭제를 시작합니다.");
-
-        System.out.print("이름 : ");
-        String name=MenuViewer.keyboard.nextLine();
-
-        int dataIdx=search(name);
-        if(dataIdx<0) {
-            System.out.println("해당하는 데이터가 존재하지 않습니다. \n");
-        }
-        else {
-            for(int idx=dataIdx;idx<(curCnt-1);idx++) {
-                infoStorage[idx]=infoStorage[idx+1];
-            }
-            curCnt--;
-            System.out.println("데이터 삭제가 완료되었습니다.");
-        }
-    }
-    private int search(String name) {
-        for(int idx=0;idx<curCnt;idx++) {
-            PhoneInfo curInfo=infoStorage[idx];
-            if(name.compareTo(curInfo.name)==0) {
-                return idx;
+    public boolean deleteData(String name) {
+        Iterator<PhoneInfo> itr=infoStorage.iterator();
+        while(itr.hasNext()){
+            PhoneInfo curInfo=itr.next();
+            if(name.compareTo(curInfo.name)==0){
+                itr.remove();
+                return true;
             }
         }
-        return -1;
+        return false;
+    }
+    private PhoneInfo search(String name) {
+
+        Iterator<PhoneInfo> itr=infoStorage.iterator();
+        while(itr.hasNext()){
+            PhoneInfo curInfo=itr.next();
+            if(name.compareTo(curInfo.name)==0)
+                return curInfo;
+        }
+        return null;
     }
 
+    public void storeToFile(){
+        try{
+            FileOutputStream file=new FileOutputStream(dataFile);
+            ObjectOutputStream out=new ObjectOutputStream(file);
+
+            Iterator<PhoneInfo> itr=infoStorage.iterator();
+            while(itr.hasNext())
+                out.writeObject(itr.next());
+            out.close();
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public void readFromFile(){
+        if(dataFile.exists()==false)
+            return;
+        try{
+            FileInputStream file=new FileInputStream(dataFile);
+            ObjectInputStream in=new ObjectInputStream(file);
+
+            while(true){
+                PhoneInfo info=(PhoneInfo)in.readObject();
+                if(info==null)
+                    break;
+                infoStorage.add(info);
+            }
+            in.close();
+        } catch (IOException e) {
+            return;
+        } catch (ClassNotFoundException e) {
+            return;
+        }
+    }
+}
+
+class SearchEventHandler implements ActionListener{
+    JTextField searchField;
+    JTextArea textArea;
+    public SearchEventHandler(JTextField field,JTextArea area){
+        searchField=field;
+        textArea=area;
+    }
+    public void actionPerformed(ActionEvent e){
+        String name=searchField.getText();
+        PhoneBookManager manager=PhoneBookManager.createManagerInst();
+        String srchResult=manager.searchData(name);
+        if(srchResult==null){
+            textArea.append("해당하는 데이터가 존재하지 않습니다.\n");
+        }
+        else{
+            textArea.append("찾으시는 정보를 알려드립니다.\n");
+            textArea.append(srchResult);
+            textArea.append("\n");
+        }
+    }
+}
+
+class DeleteEventHandler implements ActionListener{
+    JTextField delField;
+    JTextArea textArea;
+
+    public DeleteEventHandler(JTextField field,JTextArea area){
+        delField=field;
+        textArea=area;
+    }
+
+    public void actionPerformed(ActionEvent e){
+        String name=delField.getText();
+        PhoneBookManager manager=PhoneBookManager.createManagerInst();
+        boolean isDeleted=manager.deleteData(name);
+        if(isDeleted)
+            textArea.append("데이터 삭제를 완료하였습니다. \n");
+        else
+            textArea.append("해당하는 데이터가 존재하지 않습니다. \n");
+    }
+}
+
+class SearchDelFrame extends JFrame{
+    JTextField srchField=new JTextField(15);
+    JButton srchBtn=new JButton("SEARCH");
+
+    JTextField delField=new JTextField(15);
+    JButton delBtn=new JButton("DEL");
+
+    JTextArea textArea=new JTextArea(20,25);
+
+    public SearchDelFrame(){
+        super("안녕");
+        setBounds(100,200,330,450);
+        setLayout(new BorderLayout());
+        Border border=BorderFactory.createEtchedBorder();
+
+        Border srchBorder=BorderFactory.createTitledBorder(border,"Search");
+        JPanel srchPanel=new JPanel();
+        srchPanel.setBorder(srchBorder);
+        srchPanel.setLayout(new FlowLayout());
+        srchPanel.add(srchField);
+        srchPanel.add(srchBtn);
+
+        Border delBorder=BorderFactory.createTitledBorder(border,"Delete");
+        JPanel delPanel=new JPanel();
+        delPanel.setBorder(delBorder);
+        delPanel.setLayout(new FlowLayout());
+        delPanel.add(delField);
+        delPanel.add(delBtn);
+
+        JScrollPane scrollTextArea=new JScrollPane(textArea);
+        Border textBorder=BorderFactory.createTitledBorder(border,"Information Board");
+        scrollTextArea.setBorder(textBorder);
+
+        add(srchPanel,BorderLayout.NORTH);
+        add(delPanel,BorderLayout.SOUTH);
+        add(scrollTextArea,BorderLayout.CENTER);
+
+        srchBtn.addActionListener(new SearchEventHandler(srchField,textArea));
+        delBtn.addActionListener(new DeleteEventHandler(delField,textArea));
+
+        setVisible(true);
+        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+    }
 }
 
 class Main{
     public static void main(String[] args){
         PhoneBookManager manager=PhoneBookManager.createManagerInst();
+        SearchDelFrame winFrame=new SearchDelFrame();
         int choice;
 
         while(true) {
@@ -228,13 +362,10 @@ class Main{
                     case INIT_MENU.INPUT:
                         manager.inputData();
                         break;
-                    case INIT_MENU.SEARCH:
-                        manager.searchData();
-                        break;
-                    case INIT_MENU.DELETE:
-                        manager.deleteData();
                     case INIT_MENU.EXIT:
+                        manager.storeToFile();
                         System.out.println("프로그램을 종료합니다.");
+                        System.exit(0);
                         return;
                 }
             }
